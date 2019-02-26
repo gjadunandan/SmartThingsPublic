@@ -30,15 +30,16 @@ metadata {
 
 		fingerprint profileId: "0104", deviceId: "0402", inClusters: "0000,0001,0003,0500,0502,0009", outClusters: "0019", manufacturer: "Heiman", model: "b5db59bfd81e4f1f95dc57fdbba17931", deviceJoinName: "欧瑞博 烟雾报警器(SF21)"
 		fingerprint profileId: "0104", deviceId: "0402", inClusters: "0000,0001,0003,0500,0502,0009", outClusters: "0019", manufacturer: "HEIMAN", model: "98293058552c49f38ad0748541ee96ba", deviceJoinName: "欧瑞博 烟雾报警器(SF21)"
-		fingerprint profileId: "0104", deviceId: "0402", inClusters: "0000,0003,0500", outClusters: "0000", manufacturer: "ClimaxTechnology", model: "CO_00.00.00.22TC", deviceJoinName: "Ozom Smart Carbon Monoxide Sensor", mnmn: "SmartThings", vid: "generic-smoke-2"
 	}
 
 	tiles {
-		standardTile("smoke", "device.smoke", width: 2, height: 2) {
-			state("clear", label:"Clear", icon:"st.alarm.smoke.clear", backgroundColor:"#ffffff")
-			state("detected", label:"Smoke!", icon:"st.alarm.smoke.smoke", backgroundColor:"#e86d13")
+		multiAttributeTile(name:"smoke", type: "lighting", width: 6, height: 4) {
+			tileAttribute ("device.smoke", key: "PRIMARY_CONTROL") {
+				attributeState("clear", label: "clear", icon: "st.alarm.smoke.clear", backgroundColor: "#ffffff")
+				attributeState("detected", label: "Smoke!", icon: "st.alarm.smoke.smoke", backgroundColor: "#e86d13")
+			}
 		}
-        
+
 		valueTile("battery", "device.battery", decoration: "flat", inactiveLabel: false, width: 2, height: 2) {
 			state "battery", label: '${currentValue}% battery', unit: ""
 		}
@@ -54,10 +55,6 @@ metadata {
 
 def installed(){
 	log.debug "installed"
-
-	if (isOzomCO()) {
-		sendEvent(name: "battery", value: 100, unit: "%", displayed: false)
-	}
 
 	refresh()
 }
@@ -77,7 +74,7 @@ def parse(String description) {
 	if (description?.startsWith('enroll request')) {
 		List cmds = zigbee.enrollResponse()
 		log.debug "enroll response: ${cmds}"
-		result = cmds?.collect { new physicalgraph.device.HubAction(it)}
+		result = cmds?.collect { new physicalgraph.device.HubAction(it) }
 	}
 	return result
 }
@@ -87,7 +84,7 @@ def parseAttrMessage(String description){
 	def map = [:]
 	if (descMap?.clusterInt == zigbee.POWER_CONFIGURATION_CLUSTER && descMap.commandInt != 0x07 && descMap.value) {
 		map = getBatteryPercentageResult(Integer.parseInt(descMap.value, 16))
-	} else if (descMap?.clusterInt == 0x0500 && descMap.attrInt == 0x0002) {
+	} else if (descMap?.clusterInt == zigbee.IAS_ZONE_CLUSTER && descMap.attrInt == zigbee.ATTRIBUTE_IAS_ZONE_STATUS) {
 		def zs = new ZoneStatus(zigbee.convertToInt(descMap.value, 16))
 		map = translateZoneStatus(zs)
 	}
@@ -150,8 +147,4 @@ def configure() {
 	Integer reportableChange = null
 	return refresh() + zigbee.enrollResponse() + zigbee.configureReporting(zigbee.POWER_CONFIGURATION_CLUSTER, 0x0021, DataType.UINT8, 30, 21600, 0x10) +
 				zigbee.configureReporting(zigbee.IAS_ZONE_CLUSTER, zigbee.ATTRIBUTE_IAS_ZONE_STATUS, DataType.BITMAP16, minReportTime, maxReportTime, reportableChange)
-}
-
-def isOzomCO() {
-	return "ClimaxTechnology" == device.getDataValue("manufacturer") || "CO_00.00.00.22TC" == device.getDataValue("model")
 }
