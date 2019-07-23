@@ -28,7 +28,6 @@ metadata {
 		command "childOff", ["string"]
 
 		fingerprint profileId: "0104", inClusters: "0000, 0005, 0004, 0006", outClusters: "0000", manufacturer: "ORVIBO", model: "074b3ffba5a045b7afd94c47079dd553", deviceJoinName: "Switch 1"
-		fingerprint profileId: "0104", inClusters: "0006, 0005, 0004, 0000, 0003, 0B04, 0008", outClusters: "0019", manufacturer: "Aurora", model: "DoubleSocket50AU", deviceJoinName: "Aurora Smart Double Socket 1"
 	}
 	// simulator metadata
 	simulator {
@@ -69,11 +68,8 @@ def updated() {
 }
 
 def parse(String description) {
-	log.debug "description is $description"
 	Map eventMap = zigbee.getEvent(description)
-	log.debug "eventMap is $eventMap"
 	Map eventDescMap = zigbee.parseDescriptionAsMap(description)
-	log.debug "eventDescMap is $eventDescMap"
 
 	if (!eventMap && eventDescMap) {
 		eventMap = [:]
@@ -83,8 +79,8 @@ def parse(String description) {
 		}
 	}
 
-	if (eventMap.value) {
-		if (eventDescMap?.sourceEndpoint == "01") {
+	if (eventMap) {
+		if (eventDescMap?.sourceEndpoint == "01" || eventDescMap?.endpoint == "01") {
 			sendEvent(eventMap)
 		} else {
 			def childDevice = childDevices.find {
@@ -180,15 +176,11 @@ def configure() {
 		//the orvibo switch will send out device anounce message at ervery 2 mins as heart beat,setting 0x0099 to 1 will disable it.
 		zigbee.writeAttribute(zigbee.BASIC_CLUSTER, 0x0099, 0x20, 0x01, [mfgCode: 0x0000])
 	} else {
-		// Aurora (and other devices supported by this DTH in the future)
+		//other devices supported by this DTH in the future
 		zigbee.onOffConfig(0, 120) + zigbee.configureReporting(zigbee.ONOFF_CLUSTER, 0x0000, 0x10, 0, 120, null, [destEndpoint: 0x02]) + refresh()
 	}
 }
 
 private Boolean isOrvibo() {
 	device.getDataValue("manufacturer") == "ORVIBO"
-}
-
-private Boolean isAurora() {
-	device.getDataValue("manufacturer") == "Aurora"
 }
